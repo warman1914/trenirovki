@@ -3,7 +3,7 @@
    Хранене — дневник на храненето по плана: калории, протеин,
    фибри, вода. Данните се пазят в localStorage на устройството.
    ========================================================= */
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 const PLAN_URL = 'https://claude.ai/artifact/NqokyyQePUmkS5NmxhqKhT';
 const SLOTS = [['lunch','Обяд','12:00–13:00'],['snack','Междинно','16:00–17:00'],['dinner','Вечеря','19:30–20:30'],['other','Друго','свободни калории, напитки']];
 const SLOTN = Object.fromEntries(SLOTS.map(s => [s[0], s[1]]));
@@ -15,6 +15,7 @@ const KEY = 'hrn:v1';
 const clone = o => JSON.parse(JSON.stringify(o));
 const blank = () => ({v:1, targets:clone(DEF_T), days:{}, custom:[], meals:clone(DEFAULT_MEALS), fav:['chk','skyr','lentil','oats','apple','egg','rye','almond'], recent:[]});
 let DB = load();
+for(const m of DEFAULT_MEALS) if(!(DB.seenMeals||[]).includes(m.id)){ if(!DB.meals.some(x => x.id===m.id)) DB.meals.push(clone(m)); DB.seenMeals = [...(DB.seenMeals||[]), m.id]; }
 function load(){ try{ const s = localStorage.getItem(KEY); return s ? Object.assign(blank(), JSON.parse(s)) : blank(); }catch(e){ return blank(); } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){ toast('Не успях да запиша. Провери свободното място.'); } }
 let persistAsked = false;
