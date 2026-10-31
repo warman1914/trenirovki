@@ -3,7 +3,7 @@
    Тренировки — програма A/B/C (+D), дневник, прогрес, архив
    Данните се пазят в localStorage на устройството.
    ========================================================= */
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 const GOAL_KG = 85;
 const PLAN_URL = 'https://claude.ai/artifact/NqokyyQePUmkS5NmxhqKhT';
 
@@ -77,7 +77,7 @@ const tabsEl = document.getElementById('tabs'), main = document.getElementById('
 let cur = null;
 function setHeader(){
   const n = nextLetter(), last = DB.sessions[DB.sessions.length-1];
-  document.getElementById('next').innerHTML = `Следваща: <b>Тренировка ${n}</b>` + (last ? ` · последна ${last.w} на ${fmtD(last.date)}` : '');
+  document.getElementById('next').innerHTML = `Следваща: <b>Тренировка ${n}</b>` + (last ? ` · последна ${last.w} на ${fmtD(last.date)}` : '') + ` · <a href="hranene/">Хранене →</a>`;
   tabsEl.innerHTML = TABS.map(([l,h]) => `<button type="button" role="tab" aria-selected="${cur===h}" data-h="${h}">${l.length===1?'Тренировка '+l:l}${l===n?'<span class="dot" aria-label="следваща"></span>':''}</button>`).join('');
   const sel = tabsEl.querySelector('[aria-selected="true"]'); if(sel) sel.scrollIntoView({inline:'nearest',block:'nearest'});
 }
@@ -282,7 +282,7 @@ function checkImport(text){
 /* ---------- правила ---------- */
 function showRules(){
   main.innerHTML = `<div class="stack rules">
-  <div class="intro"><h2>Правила</h2><p>Кратката версия на плана. Целият план с храненето е в <a href="${PLAN_URL}" target="_blank" rel="noopener">документа</a>.</p></div>
+  <div class="intro"><h2>Правила</h2><p>Кратката версия на плана. Целият план е в <a href="${PLAN_URL}" target="_blank" rel="noopener">документа</a>, а храненето се следи в <a href="hranene/">приложението за хранене</a>.</p></div>
   <div class="kpis">
    <div class="kpi"><b>2300–2400</b><span>kcal на ден</span></div>
    <div class="kpi"><b>170–190 g</b><span>протеин</span></div>
