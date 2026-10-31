@@ -3,7 +3,7 @@
    Хранене — дневник на храненето по плана: калории, протеин,
    фибри, вода. Данните се пазят в localStorage на устройството.
    ========================================================= */
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 const PLAN_URL = 'https://claude.ai/artifact/NqokyyQePUmkS5NmxhqKhT';
 const SLOTS = [['lunch','Обяд','12:00–13:00'],['snack','Междинно','16:00–17:00'],['dinner','Вечеря','19:30–20:30'],['other','Друго','свободни калории, напитки']];
 const SLOTN = Object.fromEntries(SLOTS.map(s => [s[0], s[1]]));
@@ -190,7 +190,7 @@ function renderPortion(){
 const pv = m => `<div><b>${r0(m.kcal)}</b><span>kcal</span></div><div><b>${r0(m.p)}</b><span>протеин</span></div><div><b>${r1(m.fib)}</b><span>фибри</span></div><div><b>${r0(m.f)}</b><span>мазнини</span></div><div><b>${r0(m.c)}</b><span>въгл.</span></div>`;
 function addItems(arr){
   const day = dayW(vd);
-  for(const a of arr){ day.items.push({uid:uid(), slot:S.slot, ...a}); if(a.fid){ DB.recent = [a.fid, ...DB.recent.filter(x => x!==a.fid)].slice(0,25); } }
+  for(const a of arr){ if(a.fid==='x_water'){ day.water = (day.water||0) + Math.round(a.g); continue; } day.items.push({uid:uid(), slot:S.slot, ...a}); if(a.fid){ DB.recent = [a.fid, ...DB.recent.filter(x => x!==a.fid)].slice(0,25); } }
   save(); toast(arr.length>1 ? `Добавени ${arr.length} храни в ${SLOTN[S.slot].toLowerCase()}` : `Добавено: ${arr[0].n}`); closeSheet();
 }
 sb.addEventListener('click', e => {

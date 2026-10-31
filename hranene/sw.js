@@ -1,5 +1,5 @@
 /* Offline: app files served from cache at once and refreshed in the background. */
-const CACHE = 'hranene-v1.4';
+const CACHE = 'hranene-v1.5';
 const SHELL = ['./','./index.html','./app.js','./foods.js','./recipes.js','./manifest.webmanifest',
   './icons/apple-touch-icon.png','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
