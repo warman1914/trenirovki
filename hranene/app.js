@@ -3,7 +3,7 @@
    Хранене — дневник на храненето по плана: калории, протеин,
    фибри, вода. Данните се пазят в localStorage на устройството.
    ========================================================= */
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 const PLAN_URL = 'https://claude.ai/artifact/NqokyyQePUmkS5NmxhqKhT';
 const SLOTS = [['lunch','Обяд','12:00–13:00'],['snack','Междинно','16:00–17:00'],['dinner','Вечеря','19:30–20:30'],['other','Друго','свободни калории, напитки']];
 const SLOTN = Object.fromEntries(SLOTS.map(s => [s[0], s[1]]));
@@ -43,7 +43,7 @@ function mealItems(m){ return m.items.map(it => { if(Array.isArray(it)){ const f
 function mealTotal(m){ const t = {kcal:0,p:0,f:0,c:0,fib:0}; for(const i of mealItems(m)) for(const k in t) t[k] += i[k]||0; return t; }
 
 /* ---------- навигация ---------- */
-const TABS = [['Днес','today'],['История','history'],['Храни','foods'],['Цели','goals']];
+const TABS = [['Днес','today'],['История','history'],['Рецепти','recipes'],['Храни','foods'],['Цели','goals']];
 const tabsEl = document.getElementById('tabs'), main = document.getElementById('main');
 let cur = 'today', vd = today();
 function setTabs(){ tabsEl.innerHTML = TABS.map(([l,h]) => `<button type="button" role="tab" aria-selected="${cur===h}" data-h="${h}">${l}</button>`).join(''); }
@@ -52,7 +52,7 @@ function route(){
   const h = (location.hash||'').slice(1);
   cur = TABS.some(t => t[1]===h) ? h : 'today';
   setTabs();
-  ({today:showToday, history:showHistory, foods:showFoods, goals:showGoals})[cur]();
+  ({today:showToday, history:showHistory, recipes:showRecipes, foods:showFoods, goals:showGoals})[cur]();
 }
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0,0); });
 
@@ -239,6 +239,59 @@ function showHistory(){
     <tbody>${rows.slice().reverse().map(r => `<tr><td><a href="#today" data-day="${r.d}">${wday(r.d)} ${fmtD(r.d)}</a></td><td class="r">${r.n?r0(r.t.kcal):'–'}</td><td class="r">${r.n?r0(r.t.p):'–'}</td><td class="r">${r.n?r1(r.t.fib):'–'}</td><td class="r">${r.w?r1(r.w/1000):'–'}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted" style="margin:0">Натисни ден, за да го отвориш и допълниш.</p></section>`;
   main.querySelectorAll('[data-day]').forEach(a => a.onclick = () => { vd = a.dataset.day; });
+}
+
+
+/* ---------- рецепти ---------- */
+let openRec = null, recServ = null, recSlot = null, recPortions = 1;
+const timers = {};
+let actx = null;
+function unlockAudio(){ try{ if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; if(AC) actx = new AC(); } if(actx && actx.state==='suspended') actx.resume(); }catch(e){} }
+function beep(){ try{ if(!actx) return; [0,.25,.5].forEach(t => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = .15; o.connect(g); g.connect(actx.destination); o.start(actx.currentTime+t); o.stop(actx.currentTime+t+.15); }); }catch(e){} try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(e){} }
+function recMacro(r, serv){ const k = serv/r.servings, t = {kcal:0,p:0,f:0,c:0,fib:0}; for(const i of r.ing){ if(!i.fid) continue; const fd = food(i.fid); if(!fd) continue; const m = macro(fd, i.amt*k); for(const x in t) t[x] += m[x]; } return t; }
+function fmtAmt(a, u){ const v = u==='g'||u==='ml' ? Math.round(a) : Math.round(a*4)/4; const s = String(v).replace('.25','¼').replace('.5','½').replace('.75','¾').replace(/^0(?=[¼½¾])/,''); return u==='g' ? s+' г' : u==='ml' ? s+' мл' : s+' '+u; }
+const mmss = s => Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function timerLabel(key, s){ const t = timers[key]; if(!t) return '⏱ '+(s>=60 ? Math.round(s/60)+' мин' : s+' сек'); const left = Math.max(0, Math.ceil((t.end-Date.now())/1000)); return left ? '⏱ '+mmss(left)+' · спри' : '✓ Готово'; }
+setInterval(() => { for(const [key,t] of Object.entries(timers)){ const b = document.querySelector(`[data-timer="${key}"]`); const left = t.end - Date.now(); if(left<=0 && !t.done){ t.done = true; beep(); toast('Готово: '+t.title); } if(b) b.textContent = timerLabel(key, t.s); } }, 500);
+function showRecipes(){
+  const r = openRec && RECIPES.find(x => x.id===openRec);
+  if(!r){
+    main.innerHTML = `<section class="panel"><h3>Рецепти</h3><p class="muted" style="margin:0">Стойностите са за 1 порция. Отвори рецепта за стъпките, таймерите и добавяне към деня.</p></section>` +
+      RECIPES.map(x => `<section class="panel"><h3>${esc(x.n)}</h3><div class="muted">${x.time} · ${x.servings} порции · ${esc(x.desc)}</div><div class="preview">${pv(recMacro(x,1))}</div><div class="row"><button type="button" class="btn small" data-rec="${x.id}">Отвори рецептата</button></div></section>`).join('');
+    main.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => { openRec = b.dataset.rec; recServ = null; showRecipes(); window.scrollTo(0,0); });
+    return;
+  }
+  if(recServ==null) recServ = r.servings;
+  if(recSlot==null) recSlot = r.slot || defaultSlot();
+  const k = recServ/r.servings;
+  main.innerHTML = `<div><button type="button" class="btn ghost small" id="recback">‹ Всички рецепти</button></div>
+  <section class="panel"><h3 style="font-size:24px">${esc(r.n)}</h3><div class="muted">${r.time} · ${esc(r.desc)}</div>
+    <div class="muted">1 порция:</div><div class="preview">${pv(recMacro(r,1))}</div></section>
+  <section class="panel" aria-labelledby="h-ing"><div class="slot-h"><h3 id="h-ing">Продукти</h3>
+    <div class="row" role="group" aria-label="Брой порции"><button type="button" class="iconbtn" id="sv-" aria-label="По-малко порции">−</button><b style="min-width:72px;text-align:center">${recServ} ${recServ===1?'порция':'порции'}</b><button type="button" class="iconbtn" id="sv+" aria-label="Повече порции">+</button></div></div>
+    <div class="items">${r.ing.map(i => `<div class="item" style="grid-template-columns:1fr auto"><span>${esc(i.n)}</span><b style="font-variant-numeric:tabular-nums">${fmtAmt(i.amt*k, i.u)}</b></div>`).join('')}</div></section>
+  <section class="panel" aria-labelledby="h-st"><h3 id="h-st">Стъпки</h3>
+    <ol style="margin:0;padding-left:20px;display:grid;gap:12px">${r.steps.map((s,ix) => `<li><b>${esc(s.t)}</b><div>${esc(s.d)}</div>${s.s ? `<button type="button" class="btn ghost small" style="margin-top:6px" data-timer="${r.id}-${ix}" data-s="${s.s}" data-title="${esc(s.t)}">${timerLabel(r.id+'-'+ix, s.s)}</button>` : ''}</li>`).join('')}</ol></section>
+  ${r.notes && r.notes.length ? `<section class="panel"><h3>Бележки</h3><ul class="tips">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></section>` : ''}
+  <section class="panel" aria-labelledby="h-addr"><h3 id="h-addr">Добави към днес</h3>
+    <div class="chips" role="group" aria-label="Хранене">${SLOTS.map(([s,n]) => `<button type="button" class="chip" data-rslot="${s}" aria-pressed="${recSlot===s}">${n}</button>`).join('')}</div>
+    <div class="row"><span class="muted">Изядох</span><button type="button" class="iconbtn" id="pp-" aria-label="По-малко">−</button><b style="min-width:70px;text-align:center">${String(recPortions).replace('.5','½').replace(/^0½/,'½')} порц.</b><button type="button" class="iconbtn" id="pp+" aria-label="Повече">+</button>
+      <button type="button" class="btn" id="recadd">Добави</button></div>
+    <div class="muted">${r0(recMacro(r,recPortions).kcal)} kcal · ${r0(recMacro(r,recPortions).p)} г протеин · ${r1(recMacro(r,recPortions).fib)} г фибри</div></section>`;
+  document.getElementById('recback').onclick = () => { openRec = null; showRecipes(); window.scrollTo(0,0); };
+  document.getElementById('sv-').onclick = () => { recServ = Math.max(1, recServ-1); showRecipes(); };
+  document.getElementById('sv+').onclick = () => { recServ = Math.min(10, recServ+1); showRecipes(); };
+  document.getElementById('pp-').onclick = () => { recPortions = Math.max(0.5, recPortions-0.5); showRecipes(); };
+  document.getElementById('pp+').onclick = () => { recPortions = Math.min(4, recPortions+0.5); showRecipes(); };
+  main.querySelectorAll('[data-rslot]').forEach(b => b.onclick = () => { recSlot = b.dataset.rslot; showRecipes(); });
+  main.querySelectorAll('[data-timer]').forEach(b => b.onclick = () => { unlockAudio(); const key = b.dataset.timer;
+    if(timers[key] && !timers[key].done){ delete timers[key]; } else { timers[key] = {end:Date.now()+(+b.dataset.s)*1000, s:+b.dataset.s, title:b.dataset.title}; }
+    b.textContent = timerLabel(key, +b.dataset.s); });
+  document.getElementById('recadd').onclick = () => {
+    askPersist(); vd = today(); const day = dayW(vd), kk = recPortions/r.servings;
+    for(const i of r.ing){ if(!i.fid) continue; const fd = food(i.fid); if(!fd) continue; const g = Math.round(i.amt*kk); day.items.push({uid:uid(), slot:recSlot, fid:fd.id, n:fd.n, g, u:fd.u, ...macro(fd,g)}); }
+    save(); toast(`Добавено в ${SLOTN[recSlot].toLowerCase()} за днес`);
+  };
 }
 
 /* ---------- храни ---------- */
